@@ -32,18 +32,86 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // El método para guardar la cita ahora vive dentro del State
+  // El método para guardar las citas ahora vive dentro del State
+  // MODIFICADO: Ahora guarda una lista de 10 pacientes de prueba
   Future<void> _guardarCitaDemo() async {
-    try {
-      await FirebaseFirestore.instance.collection('citas_prueba').add({
+    // Lista de 10 pacientes de ejemplo
+    final List<Map<String, dynamic>> pacientesDePrueba = [
+      {
         'paciente': 'Erick Estrella',
         'sintoma': 'Dolor de cabeza',
         'fecha': '2025-09-20',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      },
+      {
+        'paciente': 'Ana López',
+        'sintoma': 'Fiebre alta',
+        'fecha': '2025-09-21',
+      },
+      {
+        'paciente': 'Carlos Martínez',
+        'sintoma': 'Tos persistente',
+        'fecha': '2025-09-22',
+      },
+      {
+        'paciente': 'Sofía García',
+        'sintoma': 'Dolor de garganta',
+        'fecha': '2025-09-23',
+      },
+      {
+        'paciente': 'Javier Rodríguez',
+        'sintoma': 'Molestias estomacales',
+        'fecha': '2025-09-24',
+      },
+      {
+        'paciente': 'Laura Pérez',
+        'sintoma': 'Congestión nasal',
+        'fecha': '2025-09-25',
+      },
+      {
+        'paciente': 'Miguel Sánchez',
+        'sintoma': 'Revisión general',
+        'fecha': '2025-09-26',
+      },
+      {
+        'paciente': 'Isabel Gómez',
+        'sintoma': 'Reacción alérgica',
+        'fecha': '2025-09-27',
+      },
+      {
+        'paciente': 'David Fernández',
+        'sintoma': 'Dolor de espalda',
+        'fecha': '2025-09-28',
+      },
+      {
+        'paciente': 'Elena Morales',
+        'sintoma': 'Mareos y fatiga',
+        'fecha': '2025-09-29',
+      },
+    ];
+
+    try {
+      final collection = FirebaseFirestore.instance.collection('citas_prueba');
+      // Usamos un WriteBatch para realizar todas las escrituras en una sola operación
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var pacienteData in pacientesDePrueba) {
+        // Creamos una nueva referencia de documento para cada paciente
+        final docRef = collection.doc();
+        // Añadimos el timestamp a los datos del paciente
+        final dataConTimestamp = {
+          ...pacienteData,
+          'timestamp': FieldValue.serverTimestamp(),
+        };
+        // Preparamos la operación de escritura en el batch
+        batch.set(docRef, dataConTimestamp);
+      }
+      
+      // Ejecutamos todas las operaciones del batch
+      await batch.commit();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita guardada correctamente ✅')),
+          const SnackBar(content: Text('10 citas de prueba guardadas correctamente ✅')),
         );
       }
     } catch (e) {
@@ -95,7 +163,7 @@ class _HomePageState extends State<HomePage> {
       // Botón flotante para añadir nuevas citas
       floatingActionButton: FloatingActionButton(
         onPressed: _guardarCitaDemo,
-        tooltip: 'Añadir Cita de Prueba',
+        tooltip: 'Añadir 10 Citas de Prueba',
         child: const Icon(Icons.add),
       ),
     );
