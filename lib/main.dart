@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
+import 'home_page.dart';
+import 'profile_page.dart';
 
 void main() async {
   // asegura q primero jale una cosa para q jale todo
@@ -16,12 +18,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Login Citas Médicas',
+      title: 'Login Citas Médicas', // Se mantiene tu título original
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
         // color de la app
-        primaryColor: const Color(0xFF00796B), 
+        primaryColor: const Color(0xFF00796B),
       ),
       home: LoginPage(),
       debugShowCheckedModeBanner: false,
@@ -30,6 +32,9 @@ class MyApp extends StatelessWidget {
 }
 
 class LoginPage extends StatefulWidget {
+  // NUEVO: Se agrega el constructor con key, es una buena práctica.
+  const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -41,8 +46,7 @@ class _LoginPageState extends State<LoginPage> {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // inicio de sesion 
-
+  // inicio de sesion
   Future<void> _signIn() async {
     if (_formKey.currentState!.validate()) {
       try {
@@ -50,8 +54,14 @@ class _LoginPageState extends State<LoginPage> {
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
         );
-
+        
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Bienvenido ${userCredential.user!.email!}"),
+            ),
+          );
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -73,6 +83,15 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _signOut() async {
+    await _auth.signOut();
+    if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Sesión cerrada")),
+      );
+    }
+  }
+
   Future<void> _createAccount() async {
     if (_formKey.currentState!.validate()) {
       try {
@@ -90,23 +109,23 @@ class _LoginPageState extends State<LoginPage> {
         } else if (e.code == 'email-already-in-use') {
           message = 'El correo electrónico ya está en uso.';
         } else {
-           message = e.message ?? "Error desconocido.";
+          message = e.message ?? "Error desconocido.";
         }
         _showErrorSnackbar(message);
       }
     }
   }
-  
+
   Future<void> _resetPassword() async {
-     if (emailController.text.trim().isEmpty) {
-        _showErrorSnackbar("Por favor, ingrese su correo para restablecer la contraseña.");
-        return;
+    if (emailController.text.trim().isEmpty) {
+      _showErrorSnackbar("Por favor, ingrese su correo para restablecer la contraseña.");
+      return;
     }
     try {
-        await _auth.sendPasswordResetEmail(email: emailController.text.trim());
-        _showSuccessSnackbar("Se ha enviado un enlace para restablecer la contraseña a su correo.");
+      await _auth.sendPasswordResetEmail(email: emailController.text.trim());
+      _showSuccessSnackbar("Se ha enviado un enlace para restablecer la contraseña a su correo.");
     } on FirebaseAuthException catch (e) {
-        _showErrorSnackbar(e.message ?? "No se pudo enviar el correo de restablecimiento.");
+      _showErrorSnackbar(e.message ?? "No se pudo enviar el correo de restablecimiento.");
     }
   }
 
@@ -122,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showSuccessSnackbar(String message) {
-     if (mounted) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -195,7 +214,7 @@ class _LoginPageState extends State<LoginPage> {
                       labelText: 'Contraseña',
                       prefixIcon: Icon(Icons.lock_outline),
                       border: OutlineInputBorder(
-                         borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
                     ),
                     obscureText: true,
@@ -237,6 +256,20 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     child: const Text('Iniciar Sesión', style: TextStyle(fontSize: 16)),
                   ),
+                  const SizedBox(height: 16), // Espacio entre botones
+
+                  ElevatedButton(
+                    onPressed: _signOut,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[600], // Un color diferente
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Cerrar sesión', style: TextStyle(fontSize: 16)),
+                  ),
                   const SizedBox(height: 24),
 
                   // 6. Botón de "Crear una cuenta nueva"
@@ -248,9 +281,9 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: _createAccount,
                         child: Text(
                           'Crear una cuenta nueva',
-                           style: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.bold
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.bold
                             ),
                         ),
                       ),
@@ -277,7 +310,7 @@ class HomePage extends StatelessWidget {
     if (context.mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
+        MaterialPageRoute(builder: (context) => const LoginPage()),
       );
     }
   }
@@ -294,16 +327,31 @@ class HomePage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               "¡Bienvenido!",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               user.email ?? "Usuario",
-              style: TextStyle(fontSize: 18),
+              style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 40),
+
+            // --- BOTÓN PARA IR A PERFIL (AÑADIDO) ---
+            ElevatedButton(
+              onPressed: () {
+                // Navega a la página de perfil
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+              child: const Text('Ir a Perfil'),
+            ),
+            const SizedBox(height: 20), // Espacio entre botones
+
+            // --- Botón de Cerrar Sesión (ya lo tenías) ---
             ElevatedButton(
               onPressed: () => _signOut(context),
               style: ElevatedButton.styleFrom(
