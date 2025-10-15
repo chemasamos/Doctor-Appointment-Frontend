@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'main.dart'; // NUEVO, si lo necesitas para cerrar sesión
+import 'login_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
