@@ -1,3 +1,4 @@
+// profile_page.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,14 +13,17 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _formKey = GlobalKey<FormState>();
 
-  // Controladores para los campos del formulario
+  // Controladores
   final TextEditingController nombreController = TextEditingController();
   final TextEditingController edadController = TextEditingController();
-  final TextEditingController lugarNacimientoController = TextEditingController();
+  final TextEditingController fechaNacimientoController = TextEditingController();
   final TextEditingController padecimientosController = TextEditingController();
 
-  bool _loading = true; // Inicia en true para mostrar "cargando" al entrar
+  bool _isLoading = true;
+  bool _isSaving = false;
+  User? _user;
 
   @override
   void initState() {
@@ -27,134 +31,171 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserData();
   }
 
-  // Cargar datos del usuario desde Firestore
   Future<void> _loadUserData() async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      setState(() => _loading = false);
+    setState(() => _isLoading = true);
+    _user = _auth.currentUser;
+
+    if (_user == null) {
+      if (mounted) Navigator.pushReplacementNamed(context, '/login');
       return;
     }
 
     try {
-      final doc = await _firestore.collection('usuarios').doc(user.uid).get();
-      if (doc.exists) {
+      final doc = await _firestore.collection('usuarios').doc(_user!.uid).get();
+      if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         nombreController.text = data['nombre'] ?? '';
-        edadController.text = data['edad'] ?? '';
-        lugarNacimientoController.text = data['lugar_nacimiento'] ?? '';
+        edadController.text = data['edad']?.toString() ?? '';
+        fechaNacimientoController.text = data['fechaNacimiento'] ?? '';
         padecimientosController.text = data['padecimientos'] ?? '';
       }
     } catch (e) {
-      // Manejo de errores
-      if(mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error al cargar datos: $e")),
+          SnackBar(
+            content: Text("Error al cargar datos: $e"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
-      // Nos aseguramos de quitar el indicador de carga
-      if(mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Guardar datos del usuario en Firestore
   Future<void> _saveUserData() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    // Validar que los campos no estén vacíos (opcional pero recomendado)
-    if (nombreController.text.isEmpty || edadController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Nombre y edad son campos obligatorios.")),
-        );
-        return;
-    }
-
-
-    setState(() => _loading = true);
+    if (!_formKey.currentState!.validate() || _user == null) return;
+    setState(() => _isSaving = true);
 
     try {
-      await _firestore.collection('usuarios').doc(user.uid).set({
+      final data = {
         'nombre': nombreController.text.trim(),
-        'edad': edadController.text.trim(),
-        'lugar_nacimiento': lugarNacimientoController.text.trim(),
+        // 'edad': int.tryParse(edadController.text.trim()) ?? 0,
+        'fechaNacimiento': fechaNacimientoController.text.trim(),
         'padecimientos': padecimientosController.text.trim(),
-        'email': user.email, // Guardamos también el email
-      }, SetOptions(merge: true)); // merge:true actualiza los campos sin borrar otros
+        'email': _user!.email,
+      };
+
+      await _firestore
+          .collection('usuarios')
+          .doc(_user!.uid)
+          .set(data, SetOptions(merge: true));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Información guardada exitosamente")),
+          const SnackBar(
+            content: Text("Información guardada correctamente"),
+            backgroundColor: Colors.green,
+          ),
         );
       }
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error al guardar datos: $e")),
+          SnackBar(content: Text("Error al guardar: $e"), backgroundColor: Colors.red),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final user = _auth.currentUser;
+  void dispose() {
+    nombreController.dispose();
+    edadController.dispose();
+    fechaNacimientoController.dispose();
+    padecimientosController.dispose();
+    super.dispose();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Editar Perfil")),
-      body: _loading
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16.0),
               child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      "Correo: ${user?.email ?? 'No disponible'}",
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 20),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_user?.email != null)
+                        Card(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          elevation: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'Email: ${_user!.email}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
 
-                    // FORMULARIO
-                    TextField(
-                      controller: nombreController,
-                      decoration: const InputDecoration(labelText: "Nombre completo"),
-                    ),
-                    const SizedBox(height: 10),
+                      TextFormField(
+                        controller: nombreController,
+                        decoration: const InputDecoration(
+                          labelText: "Nombre completo",
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: (v) => v!.isEmpty ? 'Campo requerido' : null,
+                      ),
+                      const SizedBox(height: 16),
 
-                    TextField(
-                      controller: edadController,
-                      decoration: const InputDecoration(labelText: "Edad"),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 10),
+                      TextFormField(
+                        controller: edadController,
+                        decoration: const InputDecoration(
+                          labelText: "Edad",
+                          prefixIcon: Icon(Icons.cake_outlined),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 16),
 
-                    TextField(
-                      controller: lugarNacimientoController,
-                      decoration: const InputDecoration(labelText: "Lugar de nacimiento"),
-                    ),
-                    const SizedBox(height: 10),
+                      TextFormField(
+                        controller: fechaNacimientoController,
+                        decoration: const InputDecoration(
+                          labelText: "Fecha de nacimiento",
+                          prefixIcon: Icon(Icons.calendar_today_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
 
-                    TextField(
-                      controller: padecimientosController,
-                      decoration: const InputDecoration(labelText: "Padecimientos"),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 30),
+                      TextFormField(
+                        controller: padecimientosController,
+                        decoration: const InputDecoration(
+                          labelText: "Padecimientos (alergias, etc.)",
+                          prefixIcon: Icon(Icons.healing_outlined),
+                        ),
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                      ),
+                      const SizedBox(height: 30),
 
-                    ElevatedButton(
-                      onPressed: _saveUserData,
-                      child: const Text("Guardar informacion"),
-                    ),
-                  ],
+                      ElevatedButton(
+                        onPressed: _isSaving ? null : _saveUserData,
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 3,
+                                ),
+                              )
+                            : const Text("Guardar Información"),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

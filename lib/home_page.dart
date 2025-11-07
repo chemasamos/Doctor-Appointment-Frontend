@@ -1,9 +1,9 @@
+// home_page.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // NUEVA IMPORTACIÓN
-import 'routes.dart'; // NUEVO: Importado de tu código anterior
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'routes.dart';
 
-// Importamos las páginas que usaremos en la barra de navegación
 import 'messages_page.dart';
 import 'settings_page.dart';
 
@@ -17,8 +17,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  // Lista de widgets que se mostrarán según el ítem seleccionado
-  // AHORA HomePageContent() es constante porque su estado se maneja internamente
   static const List<Widget> _widgetOptions = <Widget>[
     HomePageContent(),
     MessagesPage(),
@@ -33,35 +31,38 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // El Scaffold y el BottomNavigationBar tomarán el estilo del Theme
     return Scaffold(
-      body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
+      body: IndexedStack(
+        // Usamos IndexedStack para mantener el estado de las páginas
+        index: _selectedIndex,
+        children: _widgetOptions,
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
             label: 'Inicio',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.message),
+            icon: Icon(Icons.message_outlined),
+            activeIcon: Icon(Icons.message),
             label: 'Mensajes',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
+            icon: Icon(Icons.settings_outlined),
+            activeIcon: Icon(Icons.settings),
             label: 'Configuración',
           ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blueAccent,
         onTap: _onItemTapped,
       ),
     );
   }
 }
 
-// ---- CAMBIOS IMPORTANTES AQUÍ ----
-// HomePageContent ahora es un StatefulWidget para poder cargar y mostrar el nombre del usuario
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
 
@@ -70,54 +71,49 @@ class HomePageContent extends StatefulWidget {
 }
 
 class _HomePageContentState extends State<HomePageContent> {
-  String _userName = 'Usuario'; // Valor por defecto
+  String _userName = 'Usuario';
 
   @override
   void initState() {
     super.initState();
-    _loadUserName(); // Cargamos el nombre del usuario al iniciar la pantalla
+    _loadUserName();
   }
 
-  // Función para cargar el nombre desde Firestore
   Future<void> _loadUserName() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
-      if (mounted && doc.exists && doc.data()!['nombre'] != null && doc.data()!['nombre'].isNotEmpty) {
+      if (mounted && doc.exists && doc.data()?['nombre'] != null && doc.data()!['nombre'].isNotEmpty) {
         setState(() {
           _userName = doc.data()!['nombre'];
         });
-      } else {
-        // Si no hay nombre en la base de datos, usamos el del email como fallback
+      } else if (mounted) {
         setState(() {
           _userName = user.email?.split('@')[0] ?? 'Usuario';
         });
       }
     } catch (e) {
-      // En caso de error, mantenemos el nombre por defecto
       print("Error al cargar el nombre del usuario: $e");
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    // Lista de especialistas de ejemplo
     final List<String> especialistas = [
       'Cardiología', 'Dermatología', 'Neurología', 'Pediatría', 'General'
     ];
-
+    
+    // El AppBar tomará el estilo del Theme
     return Scaffold(
       appBar: AppBar(
-        title: Text("¡Hola, $_userName!"), // Usamos la variable de estado _userName
+        title: Text("¡Hola, $_userName!"),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),
             onPressed: () {},
           ),
-          // NUEVO: Botón de Perfil agregado del código anterior
           IconButton(
             icon: const Icon(Icons.person_outline),
             tooltip: 'Ir a Perfil',
@@ -125,9 +121,10 @@ class _HomePageContentState extends State<HomePageContent> {
               Navigator.pushNamed(context, Routes.profile);
             },
           ),
-          // NUEVO: Botón de Cerrar Sesión agregado del código anterior
+          // El botón de Logout se movió a SettingsPage, pero lo dejamos
+          // aquí si lo prefieres, aunque está duplicado.
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
             tooltip: 'Cerrar sesión',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -142,72 +139,124 @@ class _HomePageContentState extends State<HomePageContent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              // NUEVO: Título con estilo del tema
+              Text(
                 "¿En qué podemos ayudarte?",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               const SizedBox(height: 20),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // NUEVO: Se agregó la navegación a Routes.citas en el onTap
                   _buildServiceCard(
-                    context, 
-                    Icons.calendar_today, 
-                    "Agendar\nuna Cita",
+                    context,
+                    Icons.calendar_today_outlined,
+                    "Agendar Cita",
                     () {
-                      // Esta es la acción del botón "Gestionar Citas"
                       Navigator.pushNamed(context, Routes.citas);
-                    }
+                    },
                   ),
+                  const SizedBox(width: 16),
                   _buildServiceCard(
-                    context, 
-                    Icons.lightbulb_outline, 
-                    "Consejos\nMédicos",
+                    context,
+                    Icons.lightbulb_outline,
+                    "Consejos Médicos",
                     () {
                       // Acción para Consejos Médicos
-                    }
+                    },
                   ),
                 ],
               ),
               const SizedBox(height: 30),
 
-              const Text(
+              // NUEVO: Título con estilo del tema
+              Text(
                 "Especialistas",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 40,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: especialistas.length,
-                  itemBuilder: (context, index) {
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        child: Text(especialistas[index]),
-                      ),
-                    );
-                  },
-                ),
+              const SizedBox(height: 16),
+              
+              // --- CAMBIO DE DISEÑO: Chips en lugar de Cards ---
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 8.0,
+                children: especialistas.map((especialista) {
+                  return Chip(
+                    label: Text(especialista),
+                    backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    side: BorderSide.none,
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 30),
 
-              const Text(
+              // NUEVO: Título con estilo del tema
+              Text(
                 "Doctores Populares",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               const SizedBox(height: 10),
-              const Card(
-                child: ListTile(
-                  leading: CircleAvatar(child: Icon(Icons.person)),
-                  title: Text("Dr. Juan Pérez"),
-                  subtitle: Text("Cardiólogo"),
-                  trailing: Icon(Icons.star, color: Colors.amber),
+              
+              // --- SECCIÓN MODIFICADA CON GESTOS ---
+              // ---------------------------------------------------
+              // GESTO 3: GESTURE DETECTOR (Doble Toque)
+              // ---------------------------------------------------
+              // Envolvemos la Card con el GestureDetector
+              GestureDetector(
+                onDoubleTap: () {
+                  // Acción al hacer doble toque
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Dr. Juan Pérez añadido a favoritos'),
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                  );
+                  
+                  // --- Explicación para tu PDF ---
+                  // En una app real, aquí llamarías a Firebase:
+                  //
+                  // final user = FirebaseAuth.instance.currentUser;
+                  // if (user != null) {
+                  //   FirebaseFirestore.instance
+                  //       .collection('usuarios')
+                  //       .doc(user.uid)
+                  //       .collection('favoritos')
+                  //       .doc('id_dr_juan_perez') // ID del doctor
+                  //       .set({'nombre': 'Dr. Juan Pérez', 'esFavorito': true});
+                  // }
+                  // ---------------------------------------
+                },
+                child: Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+                    ),
+                    title: const Text("Dr. Juan Pérez", style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: const Text("Cardiólogo"),
+                    trailing: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star, color: Colors.amber, size: 20),
+                        SizedBox(width: 4),
+                        Text("4.9", style: TextStyle(fontWeight: FontWeight.bold))
+                      ],
+                    ),
+                  ),
                 ),
               ),
+              // --- FIN SECCIÓN MODIFICADA ---
             ],
           ),
         ),
@@ -215,20 +264,27 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // NUEVO: El método ahora acepta un parámetro `onTap` de tipo VoidCallback
+  // --- WIDGET MEJORADO: _buildServiceCard ---
   Widget _buildServiceCard(BuildContext context, IconData icon, String label, VoidCallback onTap) {
     return Expanded(
-      child: Card(
-        elevation: 2.0,
-        child: InkWell(
-          onTap: onTap, // Usamos el parámetro onTap aquí
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0), // Coincide con el CardTheme
+        child: Card(
+          // La Card ya toma el estilo del Theme
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               children: [
-                Icon(icon, size: 40, color: Theme.of(context).primaryColor),
-                const SizedBox(height: 10),
-                Text(label, textAlign: TextAlign.center),
+                Icon(icon, size: 40, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
               ],
             ),
           ),
