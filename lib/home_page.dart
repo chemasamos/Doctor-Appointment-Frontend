@@ -1,4 +1,3 @@
-// home_page.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -72,30 +71,45 @@ class HomePageContent extends StatefulWidget {
 
 class _HomePageContentState extends State<HomePageContent> {
   String _userName = 'Usuario';
+  String _userRol = 'paciente'; // NUEVO: Estado para el rol
+  bool _isLoading = true; // NUEVO: Estado de carga
 
   @override
   void initState() {
     super.initState();
-    _loadUserName();
+    _loadUserData(); // MODIFICADO: Renombramos la función
   }
 
-  Future<void> _loadUserName() async {
+  // MODIFICADO: Ahora carga nombre y rol
+  Future<void> _loadUserData() async {
+    setState(() => _isLoading = true);
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).get();
-      if (mounted && doc.exists && doc.data()?['nombre'] != null && doc.data()!['nombre'].isNotEmpty) {
-        setState(() {
-          _userName = doc.data()!['nombre'];
-        });
+      final data = doc.data();
+
+      if (mounted && doc.exists && data != null) {
+        _userName = data['nombre'] ?? user.email?.split('@')[0] ?? 'Usuario';
+        _userRol = data['rol'] ?? 'paciente'; // Obtenemos el rol
       } else if (mounted) {
-        setState(() {
-          _userName = user.email?.split('@')[0] ?? 'Usuario';
-        });
+        // Fallback si no hay documento en firestore
+        _userName = user.email?.split('@')[0] ?? 'Usuario';
+        _userRol = 'paciente'; // Rol por defecto
       }
     } catch (e) {
-      print("Error al cargar el nombre del usuario: $e");
+      print("Error al cargar datos del usuario: $e");
+      if (mounted) {
+        _userName = user.email?.split('@')[0] ?? 'Usuario';
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -104,8 +118,7 @@ class _HomePageContentState extends State<HomePageContent> {
     final List<String> especialistas = [
       'Cardiología', 'Dermatología', 'Neurología', 'Pediatría', 'General'
     ];
-    
-    // El AppBar tomará el estilo del Theme
+
     return Scaffold(
       appBar: AppBar(
         title: Text("¡Hola, $_userName!"),
@@ -121,157 +134,148 @@ class _HomePageContentState extends State<HomePageContent> {
               Navigator.pushNamed(context, Routes.profile);
             },
           ),
-          // El botón de Logout se movió a SettingsPage, pero lo dejamos
-          // aquí si lo prefieres, aunque está duplicado.
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.redAccent),
             tooltip: 'Cerrar sesión',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.pushReplacementNamed(context, Routes.login);
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, Routes.login);
+              }
             },
           )
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // NUEVO: Título con estilo del tema
-              Text(
-                "¿En qué podemos ayudarte?",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
+      body: _isLoading // NUEVO: Muestra un indicador de carga
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "¿En qué podemos ayudarte?",
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
-              ),
-              const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildServiceCard(
-                    context,
-                    Icons.calendar_today_outlined,
-                    "Agendar Cita",
-                    () {
-                      Navigator.pushNamed(context, Routes.citas);
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  _buildServiceCard(
-                    context,
-                    Icons.lightbulb_outline,
-                    "Consejos Médicos",
-                    () {
-                      // Acción para Consejos Médicos
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-
-              // NUEVO: Título con estilo del tema
-              Text(
-                "Especialistas",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              
-              // --- CAMBIO DE DISEÑO: Chips en lugar de Cards ---
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 8.0,
-                children: especialistas.map((especialista) {
-                  return Chip(
-                    label: Text(especialista),
-                    backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                    labelStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    side: BorderSide.none,
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 30),
-
-              // NUEVO: Título con estilo del tema
-              Text(
-                "Doctores Populares",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              
-              // --- SECCIÓN MODIFICADA CON GESTOS ---
-              // ---------------------------------------------------
-              // GESTO 3: GESTURE DETECTOR (Doble Toque)
-              // ---------------------------------------------------
-              // Envolvemos la Card con el GestureDetector
-              GestureDetector(
-                onDoubleTap: () {
-                  // Acción al hacer doble toque
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Dr. Juan Pérez añadido a favoritos'),
-                      backgroundColor: Colors.blueAccent,
-                    ),
-                  );
-                  
-                  // --- Explicación para tu PDF ---
-                  // En una app real, aquí llamarías a Firebase:
-                  //
-                  // final user = FirebaseAuth.instance.currentUser;
-                  // if (user != null) {
-                  //   FirebaseFirestore.instance
-                  //       .collection('usuarios')
-                  //       .doc(user.uid)
-                  //       .collection('favoritos')
-                  //       .doc('id_dr_juan_perez') // ID del doctor
-                  //       .set({'nombre': 'Dr. Juan Pérez', 'esFavorito': true});
-                  // }
-                  // ---------------------------------------
-                },
-                child: Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                      child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
-                    ),
-                    title: const Text("Dr. Juan Pérez", style: TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: const Text("Cardiólogo"),
-                    trailing: const Row(
-                      mainAxisSize: MainAxisSize.min,
+                    // --- INICIO DE LÓGICA CONDICIONAL ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        Icon(Icons.star, color: Colors.amber, size: 20),
-                        SizedBox(width: 4),
-                        Text("4.9", style: TextStyle(fontWeight: FontWeight.bold))
+                        // MODIFICADO: El primer botón cambia según el rol
+                        if (_userRol == 'medico')
+                          _buildServiceCard(
+                            context,
+                            Icons.dashboard_outlined, // Icono de Dashboard
+                            "Ver Dashboard", // Texto para médico
+                            () {
+                              // Navega al dashboard
+                              Navigator.pushNamed(context, Routes.dashboard);
+                            },
+                          )
+                        else
+                          _buildServiceCard(
+                            context,
+                            Icons.calendar_today_outlined, // Icono de Cita
+                            "Agendar Cita", // Texto para paciente
+                            () {
+                              // Navega a la páginda de citas
+                              Navigator.pushNamed(context, Routes.citas);
+                            },
+                          ),
+                        // --- FIN DE LÓGICA CONDICIONAL ---
+
+                        const SizedBox(width: 16),
+                        _buildServiceCard(
+                          context,
+                          Icons.lightbulb_outline,
+                          "Consejos Médicos",
+                          () {
+                            // Acción para Consejos Médicos
+                          },
+                        ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 30),
+
+                    Text(
+                      "Especialistas",
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Wrap(
+                      spacing: 8.0,
+                      runSpacing: 8.0,
+                      children: especialistas.map((especialista) {
+                        return Chip(
+                          label: Text(especialista),
+                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          labelStyle: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          side: BorderSide.none,
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 30),
+
+                    Text(
+                      "Doctores Populares",
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    
+                    GestureDetector(
+                      onDoubleTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Dr. Juan Pérez añadido a favoritos'),
+                            backgroundColor: Colors.blueAccent,
+                          ),
+                        );
+                      },
+                      child: Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                            child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+                          ),
+                          title: const Text("Dr. Juan Pérez", style: TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: const Text("Cardiólogo"),
+                          trailing: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 20),
+                              SizedBox(width: 4),
+                              Text("4.9", style: TextStyle(fontWeight: FontWeight.bold))
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              // --- FIN SECCIÓN MODIFICADA ---
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
-  // --- WIDGET MEJORADO: _buildServiceCard ---
   Widget _buildServiceCard(BuildContext context, IconData icon, String label, VoidCallback onTap) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12.0), // Coincide con el CardTheme
+        borderRadius: BorderRadius.circular(12.0),
         child: Card(
-          // La Card ya toma el estilo del Theme
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(

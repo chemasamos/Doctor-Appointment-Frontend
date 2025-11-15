@@ -1,4 +1,3 @@
-// profile_page.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,6 +19,9 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController edadController = TextEditingController();
   final TextEditingController fechaNacimientoController = TextEditingController();
   final TextEditingController padecimientosController = TextEditingController();
+
+  // NUEVO: Variable de estado para el rol
+  String? _selectedRol = 'paciente'; // Valor por defecto
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -48,6 +50,8 @@ class _ProfilePageState extends State<ProfilePage> {
         edadController.text = data['edad']?.toString() ?? '';
         fechaNacimientoController.text = data['fechaNacimiento'] ?? '';
         padecimientosController.text = data['padecimientos'] ?? '';
+        // NUEVO: Cargar el rol guardado
+        _selectedRol = data['rol'] ?? 'paciente';
       }
     } catch (e) {
       if (mounted) {
@@ -70,10 +74,11 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final data = {
         'nombre': nombreController.text.trim(),
-        // 'edad': int.tryParse(edadController.text.trim()) ?? 0,
+        'edad': int.tryParse(edadController.text.trim()) ?? 0, // MODIFICADO: guardamos como número
         'fechaNacimiento': fechaNacimientoController.text.trim(),
         'padecimientos': padecimientosController.text.trim(),
         'email': _user!.email,
+        'rol': _selectedRol, // NUEVO: Guardar el rol
       };
 
       await _firestore
@@ -141,6 +146,32 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       const SizedBox(height: 16),
 
+                      // NUEVO: Dropdown para seleccionar ROL
+                      DropdownButtonFormField<String>(
+                        value: _selectedRol,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de Usuario (Rol)',
+                          prefixIcon: Icon(Icons.admin_panel_settings_outlined), // <-- ÍCONO CORREGIDO
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'paciente',
+                            child: Text('Paciente'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'medico',
+                            child: Text('Médico'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedRol = value;
+                          });
+                        },
+                        validator: (v) => v == null ? 'Campo requerido' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      
                       TextFormField(
                         controller: nombreController,
                         decoration: const InputDecoration(
